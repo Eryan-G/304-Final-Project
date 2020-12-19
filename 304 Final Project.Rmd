@@ -1,0 +1,243 @@
+---
+title: "Predicting 2019 Canadian Federal Election if ‘everyone’ had voted"
+author: 'Eryan Gu'
+date: "December 8, 2020"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+GitHub URL:
+```{r setup, include=FALSE}
+
+#install.packages("table1")
+library(table1)
+library(dplyr)
+library(knitr)
+library(tidyverse)
+
+# Loading in the cleaned survey Data
+survey_data <- read_csv("~/Desktop/FD/survey_data.csv")
+
+# Loading in the cleaned census Data
+census_data <- read_csv("~/Desktop/FD/census_data.csv")
+
+
+```
+
+## Abstract:
+
+In this report, we are interested to predict the voting outcomes with various predictors. The objective of this report is to make analysis of how the voting results would change if everyone had voted in the 2019 Canadian federal election. In the following sections of this report, a Multi-level regression with post-stratification (MRP) model is going to be built based on the Canadian Election Study (CES) and Canadian General Social Survey (GSS) to identify how the 2019 Canadian Federal Election would have been different if ‘everyone’ had voted. We are going to use logistic regression model and perform a post-stratification analysis in order to estimate the proportion of voters who will vote for Liberal party.Public opinion and voting preference across demographic structure would be the major impact to the result of this report.
+
+## Keywords:
+
+- Canada
+- Election
+- Public Opinion
+- Voting Preference
+- Multi-level regression
+- Logistic Regression Model
+- Post-Stratification
+
+
+## Introduction:
+
+The 2019 Canadian Federal Election was held on October 21, 2019, to elect members of the House of Commons to the 43rd Canadian Parliament. The two most competitive parties are the Liberal Party led by Justin Trudeau and the Conservative Party, led by Andrew Scheer. The Canadian Federal Election was held in a 4-year period. Furthermore, Canada adopted an electoral system called " first past the post" system, which means that the candidate wins most votes in each riding wins a seat in the House of Commons, and the party with most seats would form a government; that party's leader would be the Prime Minister(Wikipedia contributors, 2020b).
+
+The 2015 federal election resulted in a Liberal majority government headed by Justin Trudeau. The Conservatives became the Official Opposition, and the New Democrats (NDP) became the third party (Wikipedia contributors, 2020). In this report, a Multi-level regression with post-stratification (MRP) model is being build based on the Canadian Election Study (CES) and Canadian General Social Survey (GSS) to identify how the 2019 Canadian Federal Election would have been different if ‘everyone’ had voted.
+
+MRP is a popular way to adjust non-representative samples to better analyze opinion and other survey responses (Alexander, 2019). According to the CES and a post-stratification data GSS, the result of the 2019 Canadian Federal Election may perform differently if ‘everyone’ had voted. ‘Everyone’ is defined as all the responses collected in the survey data CES and census data GSS except for N/A variables are being used to predict the 2019 Canadian Federal Election result. In this way, the assumption would be all the respondents who completed survey would vote on the election day. 
+
+The MRP model is being build based on the CES and a post-stratification data set GSS to identify how the 2019 Canadian Federal Election would have been different if ‘everyone’ had voted. In the Methodology section (Section 2), the data and the model would be described which was used to predict the 2019 Canadian Federal Election. prediction of election and post-stratification analysis are provided in the Results section (Section 3), and inferences of this data along with conclusions are presented in Conclusion section (Section 4).
+
+
+
+
+
+## Methodology:
+
+
+### Data:
+
+
+**Table 1**
+```{r, echo=FALSE}
+DATA <- 
+  survey_data %>%
+  select(age,
+         sex,
+         province,
+         vote_liberal)
+
+#Table_1 <-table1(~ age + sex + province + vote_liberal, data=DATA)
+
+kable(head(DATA))
+
+
+
+
+```
+
+The data was obtained from the Canadian Election Study (CES), and the CES data was used as the survey data. According to ‘Table 1’, there are four variables being used for the later modeling process: ‘age’, ‘sex’, ‘province’, and ‘vote for liberal’. Variable ‘age’ is how old are the respondents when they take the survey which is the year of 2019. There are two groups in the variable ‘sex’ which are ‘Female’ and ‘Male’. There are 12 provinces in total for the variable ‘province’. Lastly, the variable ‘vote for liberal’ determines whether the respondent is going to vote for the Liberal Party or not. These four variables are going to be used for the Model section.
+
+
+
+### Model:
+
+```{r, include=FALSE}
+
+#1 Creating the Model
+logit_model <- glm(vote_liberal ~ age + sex + province, 
+            data=survey_data, family="binomial")
+
+# Model Results (to Report in Results section)
+summary(logit_model)
+
+AIC_mod <- step(logit_model, direction = "backward")
+
+
+Logit_model <- glm(vote_liberal ~ age  + province, 
+            data=survey_data, family="binomial")
+summary(Logit_model)
+
+```
+
+```{r, include=FALSE}
+#2 Creating the Model
+logit_model2 <- glm(vote_conservative ~ age + sex + province, 
+            data=survey_data, family="binomial")
+
+# Model Results (to Report in Results section)
+summary(logit_model2)
+
+AIC_mod <- step(logit_model2, direction = "backward")
+
+census_data$logodds_estimate <-
+  logit_model2 %>%
+  predict(newdata = census_data)
+
+census_data$estimate <-
+  exp(census_data$logodds_estimate)/(1+exp(census_data$logodds_estimate))
+
+census_data %>%
+  mutate(alp_predict_prop = estimate*n) %>%
+  summarise(alp_predict = sum(alp_predict_prop)/sum(n))
+
+
+
+```
+
+```{r, include=FALSE}
+# Post-stratification calculation(to Report in Results section)
+
+census_data$logodds_estimate <-
+  Logit_model %>%
+  predict(newdata = census_data)
+
+census_data$estimate <-
+  exp(census_data$logodds_estimate)/(1+exp(census_data$logodds_estimate))
+
+census_data %>%
+  mutate(alp_predict_prop = estimate*n) %>%
+  summarise(alp_predict = sum(alp_predict_prop)/sum(n))
+
+
+```
+We are interested in predicting the popular vote outcome of the 2019 Canadian federal election if ‘everyone’ had voted by the survey data from the Canadian Election Study (CES). We are going to build a model with four variables mentioned in the Data section from survey data, and to see the effect of the variables on the probability of voting for Liberal party or not. In addition, a post-stratification technique is employed based on census data from Canadian General Social Survey (GSS). The proportion of voting Liberal party will be performed, and for each cell the probability of voting Liberal party will be calculated.
+
+Logistic regression is a statistical model that in its basic form uses a logistic function to model a binary response variable. Since ‘vote for liberal’ is a binary variable, logistic regression would be an appropriate model to use in order to predict the result of the 2019 Canadian federal election. There are 3 variables being used, which are sex, age, and 12 provinces. The formula of the general model will be:
+
+$$ log(\frac{p}{1-p}) = \beta_0+\beta_1  x_{age} + \beta_2x_{Male} + (\beta_3+\beta_4...+\beta_{15})x_{provinces}$$
+According to the model, we could see the relationship between prediction variables and probability of voting Liberal party. Where $log(\frac{p}{1-p})$ represents change of proportion of voters who will vote for Liberal party in log odds. For $\beta_0$ , it represents the intercept of the logistic model, which is the proportion of voting Liberal party in log odds when all of the variables equals 0. Nevertheless, the intercept may have not be significant since respondent age can not be 0. $\beta_1$ represents the slope of the model. Hence, for every one unit increase in age, we expect a $\beta_1$ increase in the log odds of voting for the Liberal party. $\beta_2$  is the average difference in log odds of voting
+Trump between the category for which respondent is male or female. Lastly, $\beta_3$ to $\beta_{16}$ represents the slope of the model, and $\beta_3$ to $\beta_{15}$ is the average difference in log odds of voting Liberal party between votes from respondents who live in 12 different provinces across Canada.
+
+Since we are interested in predicting the popular vote outcome of the 2019 Canadian federal election if ‘everyone’ had voted. There are only N/A variables being removed we try to keep as much variables as possible.When creating the model, it is important to select significant predictors that would affect the result of 2019 Canadian federal election. Therefore, backward elimination of AIC is used to remove the predictors with the large p-value. According to the AIC, variable 'sex' is being removed from the model. So, 'age' and 12 'province' are being used to build the logistic regression model.
+
+In order to estimate the proportion of voters who will vote for Liberal party we need to perform a post-stratification analysis.The formula for post-stratification is:
+
+$$\hat{Y}^{ps} = \frac{\sum N_j \hat{y_j}}{\sum N_j}$$
+
+Where $\hat{y_j}$ on the numerator is the estimate of each bin, and $Nj$ on the numerator is the number of voter in each bin. $N_j$ on the denominator represents the entire population size. A post-stratification means to adjust the sampling weights so that they sum to the population sizes within each post-stratum. Importantly, post-stratification tends to perform smaller variance estimates. Here we create cells based on different 'age' and 'provinces'. Using the model described in the previous sub-section we will estimate the proportion of voters in each 'age' and 'provinces' bins. Our choice of including 'age' and 'provinces' variables is because these  variables are most likely to influence voter outcomes which are explained previously. We will then weigh each proportion estimate (within each bin) by the respective population size of that bin and sum those values and divide that by the entire population size. 
+
+
+## Results:
+```{r, echo=FALSE}
+census_data %>%
+  mutate(alp_predict_prop = estimate*n) %>%
+  summarise(alp_predict = sum(alp_predict_prop)/sum(n))
+```
+
+We estimate that the proportion of voters in favour of voting for Liberal party to be 0.289 (28.9%). This is based off our post-stratification analysis of the proportion of voters in favour of Liberal party modeled by a logistic regression model, which accounted for 'age' and 'provinces'.
+
+```{r, echo=FALSE}
+kable(summary(Logit_model)$coefficients, caption = "Figure 1 - Coefficients of Logistic Model")
+```
+
+
+According to the Figure 1 table, we can see that there are 12 of the estimated parameters being positive and 2 being negative. Based on the p-value of the variables, we could see that the most of parameters have a small p-value except for ‘province Yukon’. Therefore, ‘province Yukon’ will not influence the outcome of the result significantly. For every unit increase in the variable, positive estimate predictors will result in an increase in the probability of voting for Liberal party and negative estimate predictors will result in a decrease in the probability of voting for Liberal party. Among the positive estimates, the estimates for province Nunavut, Nova Scotia, Northwest Territories, and Newfoundland and Labrador are relatively high which are about 1.34, 1.17,1,25 and 1.29 and the p-value for these province are small. So that means the respondents live in theses province tend to have higher probability of voting for Liberal party.In addition, province Saskatchewan has a negative estimate of -0.26, which shows a negative relationship with the voting result. In other words, people live in Saskatchewan tend to not voting for the Liberal party.  Moreover, the value of the estimated parameter of $\beta_0$ does not have significant meaning, since 'age' can not be zero.
+
+```{r, echo=FALSE}
+boxplot(survey_data$age~survey_data$vote_liberal, horizontal = T, names = c("No", "Yes"),ylab = "Age", xlab = "Voting for Liberal", main = "Figure 2 - Boxplot of Ages and Voting Outcome")
+```
+
+Except for the 'province', age may also greatly impact the voting result. Therefore, the box plot of the 'age' and the outcome of voting for Liberal party are created. According to Figure 1 table presented previously, we can only see there is a weak positive relationship between age and whether the voter is going to vote for the Liberal party. As we created the Figure 2 boxplot, we can observe that as the age of the respondents increase, they tend to be in favour of voting for Liberal party. Since the 1st Quantile, 3rd Quantile and the median are slightly order for people who would vote for the Liberal party.
+
+## Discussion:
+
+### Summary:
+
+To sum up the report, a Multi-level regression with post-stratification (MRP) model is being build based on the Canadian Election Study (CES) and a post-stratification data set Canadian General Social Survey (GSS) to identify how the 2019 Canadian Federal Election would have been different if ‘everyone’ had voted. When we are cleaning the data, most variables are meaningful and significant to the Canadian federal election. Although there are some N/A variables in the data, the amount of it were not great and would not result in a non-response biases to the dataset. In the Methodology section, a logistic regression model is being built in order to predict the probability of voting for the liberal party. In order to find a parsimonious model, the method of stepwise regression with AIC is used. In backward elimination, it starts with all the potential predictors in the model which are ‘age’, ‘sex’, and ‘province’, then ‘sex’ is being removed from the model since its p-value is too large. In other words, ‘sex’ would not significantly affect the election result. Based on the AIC result, no matter the voter is male or female, the potential of he or she vote for the Liberal party is similar. In the final model, ‘sex’ and 12 ‘provinces’ are used as predictor when building the logistic regression model and followed with a post post-stratification analysis to predict the voting result.
+
+### Conclusions:
+
+According to the 2019 federal election result, Liberal party have won popular votes in provinces New Brunswick, Newfoundland and Labrador, Northwest Territories, Nova Scotia, Nunavut, Ontario, Prince Edward Island, and Quebec (Federal Election 2019 Live Results, 2019). According to Figure 1 in the Results section, we can see that these wining provinces do have small p-value and higher estimates than the rest of the provinces. Thus, if the voters are from theses provinces and then the probability of voting for Liberals will be higher than the voters from British Columbia, Manitoba, and Saskatchewan. In addition, according to Coletto David ‘s (October 24, 2019) post on twitter about the 2019 Canadian federal election result by age group, we could see that Liberal share was consistent across age groups. However, based on previous section results, we found that as age increases, people tend to have higher probability of voting for Liberals. Since, we have encountered ‘everyone’, it is possible that the result from this report is different from the actual election results. 
+
+In conclusion, according to the results of estimated proportion of voters who would like to vote for Liberal party is 0.289. Furthermore, in order to make a prediction of the election result if ‘everyone’ had voted, a similar MRP model is fitted for the probability of voting for Conservative party. We get 0.274 for voters who would in favour to vote for the Conservative party. Therefore, the final result would be different to the actual 2019 Canadian federal election result that Liberals lost popular votes to Conservatives. In comparison, the actual voting percentage would be 33.12% for Liberals and 34.34% for Conservatives (Federal Election 2019 Live Results, 2019). Based on the result of this report, instead of conservatives gaining about 1.22% more votes than liberals, Liberal party would gain about 1.5% more vote than Conservatives party.
+
+
+### Weakness & Next Steps:
+
+We have got the estimate proportion of voting and make the prediction based on the results. Nevertheless, there are some limitations and drawback of the analysis. We have only fitted ‘age’ and ‘provinces’ as the variables of the model because of the limit of knowledge and techniques. Therefore, there might be some other significant predictors being missed through the modelling process, and theses missed variables could also affect the voting results. In addition, the assumption of ‘everyone’ has many limitations. It is hard to encounter everyone in actual scenarios, since time and money required to include everyone’s voting choice is limited. Furthermore, there is force majeure factor that would influence people on whether they would vote or not on the election day. Besides, the knowledge we have proceed when we are writing this report is limited, the analysis for model diagnostic is not quite sufficient. For the result, we only predicted the popular vote percentage of voting for Liberal party, because Canada adopts ‘first past the post’ as the electoral system; with the result of popular vote, we are unable to predict which party wins more seat and who would become the Prime Minister.
+
+For the next step, there are some improvements could be made in order to get a better prediction about the result and construct a more precise analysis. Firstly, we could include other factors that may impact the preference of voters. We could add more predictors into the model, like whether the person is employed or not, because different parties might have different policies on social welfare. In addition, people with different education level can have different interpretations on different parties’ campaign promises. Therefore, a subsequent study can be made to address those factors. Secondly, we could further predict the results of each riding to see which party would win more seats in the House of Commons and who become the Prime Minister. Lastly, if we could define more in detail about the assumption if ‘everyone’ had voted. In this way, we may see more differences or similarities between the prediction we made and the actual 2019 Canadian federal election results.
+
+
+## References:
+
+- Alexander, R. (2019, December 4). Rohan Alexander: Getting started with MRP. [Website]. https://rohanalexander.com/posts/2019-12-04-getting_started_with_mrp/
+
+- CHASS Data Centre. (2015). [Dataset]. http://dc.chass.utoronto.ca/myaccess.html
+
+- Coletto, David (October 24, 2019). Federal vote by age.[Twitter]. https://twitter.com/DavidColetto/status/1187538183220649984
+
+- Federal election 2019 live results. (2019, October 22). [Website]. https://newsinteractives.cbc.ca/elections/federal/2019/results/
+
+- Logistic Regression in R Tutorial. (n.d.). DataCamp Community. https://www.datacamp.com/community/tutorials/logistic-regression-R
+
+- R. Alexander, S. Caetano (2020). .’01-data_cleaning-survey.R’.[R script] https://q.utoronto.ca/courses/184060/files/9827183?module_item_id=1913034
+
+- R. Alexander, S. Caetano (2020). .’01-data_cleaning-post-strat.R’.[R script] https://q.utoronto.ca/courses/184060/files/9827182?module_item_id=1913033
+
+- R. Alexander, S. Caetano (7, October. 2020). .’gss_cleasing.R’.[R script] https://q.utoronto.ca/courses/184060/files/9422740/download?download_frd=1
+
+- S. Caetano (2020). .’ProblemSet3 - template-logistic.Rmd’.[R Markdown] https://q.utoronto.ca/courses/184060/files/10004877?module_item_id=1928040
+
+- Stephenson, Laura B; Harell, Allison; Rubenson, Daniel; Loewen, Peter John, (2020) "2019 Canadian Election Study - Online Survey", [dataset]. https://doi.org/10.7910/DVN/DUS88V, Harvard Dataverse, V1
+
+- Wikipedia contributors. (2020, December 8). 2019 Canadian federal election. [Website]. https://en.wikipedia.org/wiki/2019_Canadian_federal_election
+
+- Wikipedia contributors. (2020b, December 18). Canadian electoral system. [Website]a. https://en.wikipedia.org/wiki/Canadian_electoral_system#:%7E:text=Canada’s%20electoral%20system%20is%20referred,Member%20of%20Parliament%20(MP).&text=The%20party%20whose%20candidates%20win,seats%20becomes%20the%20Official%20Opposition.
+
+
+
+
+
+
+
+
+
+
+
+
